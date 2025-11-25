@@ -1,0 +1,62 @@
+pipeline { 
+    agent any  
+    environment { 
+        scannerHome=tool 'mysonar' 
+    } 
+    stages { 
+        stage ("CleanWS") { 
+            steps { 
+                cleanWs() 
+            } 
+        } 
+        stage ("Code") { 
+            steps { 
+                git branch: 'main', url: 'h ps://github.com/Ram-eng01/Zomato-Repo.git' 
+            } 
+        } 
+        stage ("CQA") { 
+            steps { 
+                withSonarQubeEnv('mysonar') { 
+                       sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=zomato" 
+                 } 
+            } 
+        } 
+        stage ("Quality gates") { 
+            steps { 
+                script { 
+                    waitForQualityGate abortPipeline: false, creden alsId: 'sonarpassword' 
+                } 
+            } 
+        } 
+        stage ("Build") { 
+            steps { 
+                sh 'docker build -t image1 .' 
+            } 
+        } 
+        stage ("Trivy Scan") { 
+            steps { 
+                sh 'trivy image image1' 
+            } 
+        } 
+        stage ("docker tag") { 
+            steps { 
+                sh 'docker tag image1 rammohan855/nodejs:zomato' 
+            } 
+        }  
+        stage ("docker push") { 
+            steps { 
+                script { 
+                    withDockerRegistry(creden alsId: 'dockerpassword') { 
+                        sh 'docker push rammohan855/nodejs:zomato' 
+                    } 
+                } 
+            } 
+        } 
+        stage ("docker run") { 
+            steps { 
+                sh "docker run -itd --name zomato-cont -p 3000:3000 rammohan855/nodejs:zomato" 
+            } 
+        } 
+    }     
+     
+}
